@@ -6,12 +6,8 @@ import * as dotenv from 'dotenv';
 // Load environment variables from .env file
 dotenv.config();
 
-/**
- * DatabaseModule
- * --------------
- * Handles MongoDB connection using Mongoose in a NestJS environment.
- * Does not use @nestjs/config — uses process.env directly.
- */
+// Handles MongoDB connection using Mongoose in a NestJS environment.
+//Does not use @nestjs/config — uses process.env directly.
 @Module({
   imports: [
     MongooseModule.forRoot(process.env.MONGO_URI as string, {
@@ -26,10 +22,8 @@ dotenv.config();
 export class DatabaseModule implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DatabaseModule.name);
 
-  /**
-   * Called once the module is initialized.
-   * Sets up event listeners and logs connection status.
-   */
+  // Called once the module is initialized.
+  // Sets up event listeners and logs connection status.
   async onModuleInit() {
     const mongoUri = process.env.MONGO_URI;
 
@@ -58,9 +52,7 @@ export class DatabaseModule implements OnModuleInit, OnModuleDestroy {
     this.logger.log('MongoDB connection initialized');
   }
 
-  /**
-   * Graceful shutdown for MongoDB when NestJS application stops.
-   */
+  // Graceful shutdown for MongoDB when NestJS application stops.
   async onModuleDestroy() {
     await mongoose.connection.close();
     this.logger.log('MongoDB connection closed on application shutdown');
