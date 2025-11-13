@@ -1,9 +1,14 @@
-import { Body, Controller, Get, Logger, Post } from '@nestjs/common';
-import * as nodemailer from 'nodemailer';
-import * as dotenv from 'dotenv';
-dotenv.config();
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Post,
+  Query,
+  ValidationPipe,
+} from '@nestjs/common';
 import { EmailLogsService } from './email-logs.service';
-import { SendMailDto } from './email.dto';
+import { GetEmailsDto, SendMailDto } from './email.dto';
 
 @Controller()
 export class EmailLogsController {
@@ -21,26 +26,10 @@ export class EmailLogsController {
     }
   }
 
-  @Get('logs')
-  findAll() {
-    return this.emailLogsService.findAll();
+  @Get()
+  async getEmailLogs(
+    @Query(new ValidationPipe({ transform: true })) query: GetEmailsDto,
+  ) {
+    return await this.emailLogsService.getEmailLogs(query);
   }
-
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.emailLogsService.findOne(+id);
-  // }
-
-  // @Patch(':id')
-  // update(
-  //   @Param('id') id: string,
-  //   @Body() updateEmailLogDto: UpdateEmailLogDto,
-  // ) {
-  //   return this.emailLogsService.update(+id, updateEmailLogDto);
-  // }
-
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.emailLogsService.remove(+id);
-  // }
 }
