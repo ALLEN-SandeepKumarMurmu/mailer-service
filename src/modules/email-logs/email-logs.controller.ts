@@ -1,16 +1,27 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post } from '@nestjs/common';
+import * as nodemailer from 'nodemailer';
+import * as dotenv from 'dotenv';
+dotenv.config();
 import { EmailLogsService } from './email-logs.service';
+import { SendMailDto } from './email.dto';
 
 @Controller()
 export class EmailLogsController {
+  private readonly logger = new Logger(EmailLogsController.name);
   constructor(private readonly emailLogsService: EmailLogsService) {}
 
-  // @Post()
-  // create(@Body() createEmailLogDto: CreateEmailLogDto) {
-  //   return this.emailLogsService.create(createEmailLogDto);
-  // }
+  @Post()
+  async sendMail(@Body() body: SendMailDto) {
+    try {
+      this.logger.log('Sending email with data:', JSON.stringify(body));
+      return this.emailLogsService.sendMail(body);
+    } catch (error) {
+      this.logger.error('Error sending mail:', error.message);
+      return { error: 'Failed to send email', details: error.message };
+    }
+  }
 
-  @Get()
+  @Get('logs')
   findAll() {
     return this.emailLogsService.findAll();
   }

@@ -6,8 +6,8 @@ import { EmailLogsModule } from './email-logs/email-logs.module';
   imports: [
     RouterModule.register([
       {
-        path: 'email',
-        children: [{ path: 'logs', module: EmailLogsModule }],
+        path: '',
+        children: [{ path: 'email', module: EmailLogsModule }],
       },
     ]),
     EmailLogsModule,

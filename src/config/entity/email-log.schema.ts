@@ -5,22 +5,30 @@ export enum MailStatus {
   PENDING = 'pending',
   SENT = 'sent',
   FAILED = 'failed',
-  QUEUED = 'queued',
 }
 
 @Schema({ timestamps: true, collection: 'email_logs' })
 export class EmailLog extends Document {
   @Prop({ required: true })
-  from: string;
+  to: string;
 
   @Prop({ required: true })
-  to: string;
+  from: string;
 
   @Prop({ required: true })
   subject: string;
 
   @Prop()
-  template?: string;
+  cc?: string;
+
+  @Prop()
+  bcc?: string;
+
+  @Prop()
+  html?: string;
+
+  @Prop()
+  text?: string;
 
   @Prop({
     type: String,
@@ -34,9 +42,6 @@ export class EmailLog extends Document {
 
   @Prop()
   errorMessage?: string;
-
-  @Prop({ default: 0 })
-  retryCount: number;
 }
 
 export const EmailLogSchema = SchemaFactory.createForClass(EmailLog);

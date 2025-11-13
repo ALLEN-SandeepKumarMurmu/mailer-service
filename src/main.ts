@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { Logger } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -19,14 +19,13 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // // Apply global validation
-  // app.useGlobalPipes(
-  //   new ValidationPipe({
-  //     whitelist: true,
-  //     forbidNonWhitelisted: true,
-  //     transform: true,
-  //   }),
-  // );
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true, // strip unknown fields
+      forbidNonWhitelisted: true, // throw error if unknown fields exist
+      transform: true, // auto-transform types
+    }),
+  );
 
   // Read port from environment or default to 3000
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;
