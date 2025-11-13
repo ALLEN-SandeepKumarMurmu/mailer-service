@@ -1,13 +1,15 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { Logger, ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { join } from 'path';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env file
 dotenv.config();
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Set global prefix for all routes
   app.setGlobalPrefix(process.env.API_PREFIX || 'api');
@@ -26,6 +28,10 @@ async function bootstrap() {
       transform: true, // auto-transform types
     }),
   );
+
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads/',
+  });
 
   // Read port from environment or default to 3000
   const port = process.env.PORT ? Number(process.env.PORT) : 3000;

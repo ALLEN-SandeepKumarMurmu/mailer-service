@@ -9,6 +9,7 @@ import {
 import * as nodemailer from 'nodemailer';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model } from 'mongoose';
+import { existsSync, unlinkSync } from 'fs';
 import { GetEmailsDto, SendMailDto } from './email.dto';
 import { EmailLog, MailStatus } from '../../config/entity/email-log.schema';
 
@@ -42,10 +43,69 @@ export class EmailLogsService {
     let hours = d.getHours();
     const minutes = String(d.getMinutes()).padStart(2, '0');
     const ampm = hours >= 12 ? 'PM' : 'AM';
-    hours = hours % 12 || 12; // convert to 12-hour format
+    hours = hours % 12 || 12;
     const hourStr = String(hours).padStart(2, '0');
 
     return `${day}-${month}-${year} ${hourStr}:${minutes}${ampm}`;
+  }
+
+  // Handle mail sending in background
+  private async sendMailInBackground(payload: SendMailDto, logId: string) {
+    try {
+      const mailOptions: Record<string, any> = {
+        from: process.env.MAIL_USER,
+        to: payload.to,
+        subject: payload.subject,
+      };
+
+      if (payload.text) mailOptions.text = payload.text;
+      if (payload.html) mailOptions.html = payload.html;
+      if (payload.cc) mailOptions.cc = payload.cc;
+      if (payload.bcc) mailOptions.bcc = payload.bcc;
+      if (payload.attachments?.length)
+        mailOptions.attachments = payload.attachments;
+
+      // Send mail
+      const info = await this.transporter.sendMail(mailOptions);
+
+      // Update log to sent
+      await this.emailLogModel.findByIdAndUpdate(logId, {
+        status: MailStatus.SENT,
+        messageId: info.messageId,
+      });
+
+      this.logger.log(
+        `Mail sent to ${payload.to}, Message ID: ${info.messageId}`,
+      );
+
+      //  Delete files after successful send
+      if (payload.attachments?.length) {
+        payload.attachments.forEach((file) => this.deleteFile(file.path));
+      }
+    } catch (error) {
+      // Update log to failed
+      await this.emailLogModel.findByIdAndUpdate(logId, {
+        status: MailStatus.FAILED,
+        errorMessage: error.message,
+      });
+
+      this.logger.error(`Mail send failed for ${payload.to}: ${error.message}`);
+      // Delete files even if sending failed
+      if (payload.attachments?.length) {
+        payload.attachments.forEach((file) => this.deleteFile(file.path));
+      }
+    }
+  }
+
+  private deleteFile(path?: string) {
+    try {
+      if (path && existsSync(path)) {
+        unlinkSync(path);
+        this.logger.log(`Deleted file: ${path}`);
+      }
+    } catch (err) {
+      this.logger.warn(`Failed to delete file ${path}: ${err.message}`);
+    }
   }
 
   constructor(
@@ -61,65 +121,43 @@ export class EmailLogsService {
     });
   }
 
+  // Queue mail and send it in background
   async sendMail(payload: SendMailDto) {
-    // Create log entry with status = pending
-    const log = new this.emailLogModel({
-      to: payload.to,
-      from: process.env.MAIL_USER,
-      subject: payload.subject,
-      cc: payload.cc,
-      bcc: payload.bcc,
-      text: payload.text,
-      html: payload.html,
-      status: MailStatus.PENDING,
-    });
-
-    await log.save();
-    this.logger.log(`Created log entry (pending) for ${payload.to}`);
-
     try {
-      // Build mail options dynamically
-      const mailOptions: Record<string, any> = {
-        from: process.env.MAIL_USER,
+      // Create log entry with pending status
+      const log = new this.emailLogModel({
         to: payload.to,
+        from: process.env.MAIL_USER,
         subject: payload.subject,
-      };
+        cc: payload.cc,
+        bcc: payload.bcc,
+        text: payload.text,
+        html: payload.html,
+        status: MailStatus.PENDING,
+      });
 
-      if (payload.text) mailOptions.text = payload.text;
-      if (payload.html) mailOptions.html = payload.html;
-      if (payload.cc) mailOptions.cc = payload.cc;
-      if (payload.bcc) mailOptions.bcc = payload.bcc;
-      if (payload.attachments?.length)
-        mailOptions.attachments = payload.attachments;
-
-      //Send mail
-      const info = await this.transporter.sendMail(mailOptions);
-
-      //Update log entry to "sent"
-      log.status = MailStatus.SENT;
-      log.messageId = info.messageId;
       await log.save();
+      this.logger.log(`Queued email to ${payload.to}`);
 
-      this.logger.log(
-        `Mail sent successfully to ${payload.to} (Message ID: ${info.messageId})`,
-      );
+      const logId = log._id?.toString();
+      // Run background task without blocking response
+      this.sendMailInBackground(payload, logId)
+        .then(() =>
+          this.logger.log(`Background task started for ${payload.to}`),
+        )
+        .catch((err) =>
+          this.logger.error(`Background task failed: ${err.message}`),
+        );
 
+      // Return immediately
       return {
         success: true,
-        message: 'Mail sent successfully',
-        messageId: info.messageId,
+        message: 'Email queued successfully',
+        logId: log._id,
       };
     } catch (error) {
-      // On failure — mark as failed with reason
-      log.status = MailStatus.FAILED;
-      log.errorMessage = error.message;
-      await log.save();
-
-      this.logger.error(
-        `Failed to send mail to ${payload.to}: ${error.message}`,
-        error.stack,
-      );
-      throw new InternalServerErrorException('Failed to send email');
+      this.logger.error('Failed to queue email', error.stack);
+      throw new InternalServerErrorException('Failed to queue email');
     }
   }
 
